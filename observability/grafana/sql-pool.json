@@ -1,0 +1,100 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "links": [
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Overview", "type": "link", "url": "/d/pulpitum-overview/pulpitum-overview?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Core metrics", "type": "link", "url": "/d/pulpitum-core-metrics/pulpitum-core-metrics?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Query performance", "type": "link", "url": "/d/pulpitum-query-performance/pulpitum-query-performance?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Archiving", "type": "link", "url": "/d/pulpitum-archiving/pulpitum-archiving?${job:queryparam}" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "100 * sum by (exported_job) (pulpitum_db_pool_connections{exported_job=~\"$job\", pulpitum_db_pool_state=\"in_use\"}) / sum by (exported_job) (pulpitum_db_pool_connections{exported_job=~\"$job\", pulpitum_db_pool_state=\"max\"})", "legendFormat": "{{exported_job}}" }],
+      "title": "Checked-out connection utilization", 
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (exported_job, pulpitum_db_pool_state) (pulpitum_db_pool_connections{exported_job=~\"$job\", pulpitum_db_pool_state=~\"idle|in_use|open|max\"})", "legendFormat": "{{exported_job}} {{pulpitum_db_pool_state}}" }],
+      "title": "Connection states",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (exported_job) (pulpitum_db_pool_connections{exported_job=~\"$job\", pulpitum_db_pool_state=\"waiters\"})", "legendFormat": "{{exported_job}}" }],
+      "title": "Pool waiters",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "expr": "1000 * histogram_quantile(0.95, sum by (le, exported_job) (rate(pulpitum_db_pool_acquire_duration_seconds_bucket{exported_job=~\"$job\"}[$__rate_interval])))", "legendFormat": "{{exported_job}} p95" },
+        { "refId": "B", "expr": "1000 * histogram_quantile(0.99, sum by (le, exported_job) (rate(pulpitum_db_pool_acquire_duration_seconds_bucket{exported_job=~\"$job\"}[$__rate_interval])))", "legendFormat": "{{exported_job}} p99" }
+      ],
+      "title": "Connection acquire duration", 
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (exported_job, pulpitum_db_pool_outcome) (rate(pulpitum_db_pool_acquires_total{exported_job=~\"$job\"}[$__rate_interval]))", "legendFormat": "{{exported_job}} {{pulpitum_db_pool_outcome}}" }],
+      "title": "Connection acquire outcomes / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (exported_job, pulpitum_db_pool_outcome) (rate(pulpitum_db_pool_connections_created_total{exported_job=~\"$job\"}[$__rate_interval]))", "legendFormat": "{{exported_job}} created {{pulpitum_db_pool_outcome}}" },
+        { "refId": "B", "expr": "sum by (exported_job) (rate(pulpitum_db_pool_connections_closed_total{exported_job=~\"$job\"}[$__rate_interval]))", "legendFormat": "{{exported_job}} closed" }
+      ],
+      "title": "Connection creation and churn / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, exported_job, db_operation_name) (rate(traces_span_metrics_duration_milliseconds_bucket{exported_job=~\"$job\", db_operation_name=~\"POOL_PERMIT|POOL_CHECKOUT|POOL_CONNECT\"}[$__rate_interval])))", "legendFormat": "{{exported_job}} {{db_operation_name}} p95" },
+        { "refId": "B", "expr": "histogram_quantile(0.99, sum by (le, exported_job, db_operation_name) (rate(traces_span_metrics_duration_milliseconds_bucket{exported_job=~\"$job\", db_operation_name=~\"POOL_PERMIT|POOL_CHECKOUT|POOL_CONNECT\"}[$__rate_interval])))", "legendFormat": "{{exported_job}} {{db_operation_name}} p99" }
+      ],
+      "title": "Pool acquire phase duration from traces",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, exported_job, db_operation_name) (rate(traces_span_metrics_duration_milliseconds_bucket{exported_job=~\"$job\", span_kind=\"SPAN_KIND_CLIENT\", db_operation_name=~\"SELECT|INSERT|UPDATE|DELETE|SNAPSHOT\"}[$__rate_interval])))", "legendFormat": "{{exported_job}} {{db_operation_name}} p95" }],
+      "title": "CockroachDB statement duration p95",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pulpitum", "database", "sql", "pool"],
+  "templating": { "list": [{ "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(pulpitum_db_pool_connections, exported_job)", "includeAll": true, "multi": true, "name": "job", "query": "label_values(pulpitum_db_pool_connections, exported_job)", "refresh": 1, "type": "query" }] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Pulpitum SQL pool",
+  "uid": "pulpitum-sql-pool",
+  "version": 2
+}

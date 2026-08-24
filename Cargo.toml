@@ -1,0 +1,85 @@
+[package]
+name = "pulpitum"
+version = "0.1.0"
+edition = "2024"
+autobins = false
+rust-version = "1.94"
+description = "Bucketed hot/cold KV table routing with safe archival cutovers"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/pulpitum-tech/pulpitum"
+homepage = "https://www.pulpitum.tech/"
+documentation = "https://www.pulpitum.tech/"
+
+[dependencies]
+arrow-array = "=58.4.0"
+arrow-schema = "=58.4.0"
+async-trait = "0.1"
+axum = { version = "0.8", optional = true }
+bytes = "1"
+datafusion = { version = "54.1.0", optional = true }
+futures = { version = "0.3", optional = true }
+chrono = { version = "0.4", features = ["serde"] }
+opendal = { version = "0.58.1", features = ["services-s3"] }
+opentelemetry = { version = "0.32.0", optional = true }
+parquet = { version = "=58.4.0", features = ["arrow", "zstd"] }
+opentelemetry-otlp = { version = "0.32.0", features = ["grpc-tonic", "metrics"], optional = true }
+opentelemetry_sdk = { version = "0.32.1", optional = true }
+pgwire = { version = "0.40.5", default-features = false, features = ["server-api-ring", "pg-type-chrono"], optional = true }
+reqwest = { version = "0.13.4", features = ["json", "rustls"], optional = true }
+rustls = { version = "0.23.43", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
+rustls-pki-types = "1.15.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+sqlparser = { version = "0.62", optional = true }
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "time", "net"] }
+tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
+tokio-postgres-rustls = "0.13.0"
+tracing = "0.1.44"
+uuid = { version = "1", features = ["v4"] }
+tracing-opentelemetry = { version = "0.33.0", optional = true }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "time", "test-util"] }
+tokio-rustls = "0.26.4"
+
+[features]
+datafusion = ["dep:datafusion", "dep:futures"]
+opentelemetry = ["dep:opentelemetry"]
+opentelemetry_sdk = ["dep:opentelemetry_sdk"]
+opentelemetry-otlp = ["dep:opentelemetry-otlp"]
+tracing-opentelemetry = ["dep:tracing-opentelemetry"]
+tracing-subscriber = ["dep:tracing-subscriber"]
+sql-sidecar = [
+    "datafusion",
+    "opentelemetry",
+    "opentelemetry_sdk",
+    "opentelemetry-otlp",
+    "tracing-opentelemetry",
+    "tracing-subscriber",
+    "dep:pgwire",
+    "dep:sqlparser",
+]
+showcase = ["sql-sidecar", "reqwest", "dep:axum"]
+reqwest = ["dep:reqwest"]
+
+[[bin]]
+name = "pulpitum-migrate"
+path = "src/bin/pulpitum-migrate.rs"
+
+[[bin]]
+name = "pulpitum-archiver"
+path = "src/bin/pulpitum-archiver.rs"
+required-features = ["showcase"]
+
+[[example]]
+name = "showcase"
+required-features = ["showcase"]
+
+[[bin]]
+name = "pulpitum-sql-sidecar"
+path = "src/bin/pulpitum-sql-sidecar.rs"
+required-features = ["sql-sidecar"]

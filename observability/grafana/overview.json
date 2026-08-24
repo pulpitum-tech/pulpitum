@@ -1,0 +1,172 @@
+{
+  "annotations": { "list": [] },
+  "description": "At-a-glance health for the Pulpitum workload, its SQL connection pool, and the Prometheus targets that supply this dashboard.",
+  "editable": true,
+  "links": [
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Core metrics", "type": "link", "url": "/d/pulpitum-core-metrics/pulpitum-core-metrics?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Query performance", "type": "link", "url": "/d/pulpitum-query-performance/pulpitum-query-performance?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Archiving", "type": "link", "url": "/d/pulpitum-archiving/pulpitum-archiving?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "SQL pool", "type": "link", "url": "/d/pulpitum-sql-pool/pulpitum-sql-pool?${job:queryparam}" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 1,
+          "max": 100,
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 75 }, { "color": "red", "value": 90 }] },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        { "expr": "100 * sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"open\"}) / sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"max\"})", "legendFormat": "Used" }
+      ],
+      "title": "Connection pool capacity",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 10 }] },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Idle" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "In use" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 0 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        { "expr": "sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"idle\"})", "legendFormat": "Idle" },
+        { "expr": "sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"in_use\"})", "legendFormat": "In use" },
+        { "expr": "sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"waiters\"})", "legendFormat": "Waiters" }
+      ],
+      "title": "Connection pool status",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1000 }, { "color": "red", "value": 5000 }] },
+          "unit": "ops"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "SQL p95" }, "properties": [{ "id": "unit", "value": "ms" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 100 }, { "color": "red", "value": 500 }] } }] },
+          { "matcher": { "id": "byName", "options": "Archive failures" }, "properties": [{ "id": "unit", "value": "short" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        { "expr": "sum(rate(traces_span_metrics_calls_total{job=~\"$job\", db_operation_name!=\"\"}[$__rate_interval]))", "legendFormat": "SQL queries / s" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{job=~\"$job\", db_operation_name!=\"\"}[$__rate_interval])))", "legendFormat": "SQL p95" },
+        { "expr": "sum(increase(pulpitum_archive_failures_total{job=~\"$job\"}[15m]))", "legendFormat": "Archive failures" }
+      ],
+      "title": "Workload status",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red", "index": 0, "text": "DOWN" }, "1": { "color": "green", "index": 1, "text": "UP" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 12, "w": 16, "x": 0, "y": 7 },
+      "options": { "cellHeight": "sm", "showHeader": true },
+      "targets": [
+        { "expr": "max by (job, instance) (up{job=~\"$job\"})", "format": "table", "instant": true, "refId": "A" }
+      ],
+      "title": "Monitored targets",
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "Value": "Status", "instance": "Target", "job": "Job" } } }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 10 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 7 },
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        { "expr": "sum by (pulpitum_bucket_tier) (pulpitum_buckets{job=~\"$job\"})", "legendFormat": "{{pulpitum_bucket_tier}}" }
+      ],
+      "title": "Known buckets by storage tier",
+      "type": "bargauge"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pulpitum", "overview"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(up, job)",
+        "includeAll": true,
+        "multi": true,
+        "name": "job",
+        "query": "label_values(up, job)",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Pulpitum overview",
+  "uid": "pulpitum-overview",
+  "version": 2
+}

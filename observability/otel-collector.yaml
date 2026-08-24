@@ -1,0 +1,52 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:POD_IP}:4317
+      http:
+        endpoint: ${env:POD_IP}:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+connectors:
+  spanmetrics:
+    dimensions:
+      - name: db.operation.name
+      - name: db.query.summary
+      # Gateway labels identify the SQL proxy boundary and query shape.
+      - name: pulpitum.sql.origin
+      - name: db.query.text
+      # Literal statement capture is opt-in in the SQL sidecar.
+      - name: pulpitum.sql.template
+      # Fixed archival operation/phase labels only; never bucket or job IDs.
+      - name: pulpitum.archive.operation
+      - name: pulpitum.archive.coordinator.phase
+
+exporters:
+  prometheus:
+    endpoint: ${env:POD_IP}:8889
+  debug: {}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      # Add an OTLP exporter for Tempo/Jaeger in the deployment-specific overlay.
+      exporters: [debug, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]
+  telemetry:
+    logs:
+      level: info

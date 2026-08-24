@@ -1,0 +1,73 @@
+# Add this ConfigMap and sidecar patch to the Node workload's namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulpitum-otel-collector
+  labels:
+    app.kubernetes.io/part-of: pulpitum
+    app.kubernetes.io/component: observability
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: ${env:POD_IP}:4317 }
+          http: { endpoint: ${env:POD_IP}:4318 }
+    processors:
+      memory_limiter: { check_interval: 1s, limit_mib: 256 }
+      batch: { timeout: 5s }
+    connectors:
+      spanmetrics:
+        dimensions:
+          - name: db.operation.name
+          - name: db.query.summary
+          # Gateway labels identify the SQL proxy boundary and query shape.
+          - name: pulpitum.sql.origin
+          - name: db.query.text
+          # Literal statement capture is opt-in in the SQL sidecar.
+          - name: pulpitum.sql.template
+          # Fixed archival operation/phase labels only; never bucket or job IDs.
+          - name: pulpitum.archive.operation
+          - name: pulpitum.archive.coordinator.phase
+    exporters:
+      prometheus: { endpoint: ${env:POD_IP}:8889 }
+      debug: {}
+    service:
+      pipelines:
+        metrics: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [prometheus] }
+        traces: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug, spanmetrics] }
+        metrics/spanmetrics: { receivers: [spanmetrics], exporters: [prometheus] }
+---
+# Strategic-merge fragment for the existing Node Deployment. The Pulpitum
+# process itself must set OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messages-api
+spec:
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8889"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.121.0
+          args: ["--config=/conf/config.yaml"]
+          env:
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          ports:
+            - { name: otlp-grpc, containerPort: 4317 }
+            - { name: otlp-http, containerPort: 4318 }
+            - { name: otel-prom, containerPort: 8889 }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - { name: otel-config, mountPath: /conf, readOnly: true }
+      volumes:
+        - name: otel-config
+          configMap: { name: pulpitum-otel-collector }

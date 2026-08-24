@@ -1,0 +1,135 @@
+name: pulpitum-sidecar-smoke
+
+services:
+  cockroach:
+    image: cockroachdb/cockroach:v25.4.10
+    command: >-
+      start --insecure --store=/cockroach/cockroach-data
+      --listen-addr=0.0.0.0:26257 --advertise-addr=cockroach:26257
+      --http-addr=0.0.0.0:8080 --join=cockroach:26257
+    networks: [smoke]
+
+  cockroach-init:
+    image: cockroachdb/cockroach:v25.4.10
+    depends_on:
+      cockroach:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until cockroach init --insecure --host=cockroach:26257; do sleep 1; done
+    restart: "no"
+    networks: [smoke]
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [smoke]
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/pulpitum
+    restart: "no"
+    networks: [smoke]
+
+  migrator:
+    image: pulpitum/sql-sidecar:smoke
+    entrypoint: ["/usr/local/bin/pulpitum-migrate"]
+    environment:
+      COCKROACH_MIGRATION_URL: postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      PULPITUM_RUNTIME_ROLE: pulpitum_runtime
+    depends_on:
+      cockroach-init:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [smoke]
+
+  sidecar-security-init:
+    image: cockroachdb/cockroach:v25.4.10
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        cockroach cert create-ca --certs-dir=/security --ca-key=/security/ca.key
+        cockroach cert create-node sql-sidecar localhost 127.0.0.1 --certs-dir=/security --ca-key=/security/ca.key
+        printf '%s\n' 'sidecar-smoke-password' > /security/password
+        chmod 0444 /security/ca.crt /security/node.crt /security/node.key /security/password
+    restart: "no"
+    volumes:
+      - sidecar-security:/security
+    networks: [smoke]
+
+  sql-sidecar:
+    image: pulpitum/sql-sidecar:smoke
+    environment:
+      COCKROACH_URL: postgresql://pulpitum_runtime@cockroach:26257/defaultdb?sslmode=disable
+      COCKROACH_POOL_MAX_CONNECTIONS: "4"
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: pulpitum
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_ALLOW_HTTP: "true"
+      PULPITUM_SQL_LISTEN_ADDR: 0.0.0.0:5433
+      PULPITUM_SQL_TLS_CERT_PATH: /security/node.crt
+      PULPITUM_SQL_TLS_KEY_PATH: /security/node.key
+      PULPITUM_SQL_PASSWORD_FILE: /security/password
+      PULPITUM_SQL_USER: pulpitum
+      PULPITUM_SQL_DATABASE: pulpitum
+      PULPITUM_SQL_TABLE_ID: pulpitum.smoke.messages.v1
+      PULPITUM_SQL_ARCHIVE_PREFIX: smoke
+      PULPITUM_SQL_ARCHIVE_CACHE_MAX_ENTRIES: "0"
+      RUST_LOG: pulpitum=info
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      sidecar-security-init:
+        condition: service_completed_successfully
+    volumes:
+      - sidecar-security:/security:ro
+    networks: [smoke]
+
+  sql-smoke:
+    image: postgres:17-alpine
+    depends_on:
+      sql-sidecar:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        printf 'sql-sidecar:5433:pulpitum:pulpitum:%s\n' "$$(cat /security/password)" > /tmp/pgpass
+        chmod 0600 /tmp/pgpass
+        until pg_isready --host=sql-sidecar --port=5433 --username=pulpitum --dbname=pulpitum; do sleep 1; done
+        timestamp="$$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        id="smoke-$$(date -u '+%s')"
+        PGPASSFILE=/tmp/pgpass psql "postgresql://pulpitum@sql-sidecar:5433/pulpitum?sslmode=verify-full&sslrootcert=/security/ca.crt&channel_binding=require" --set=ON_ERROR_STOP=1 \
+          --command "INSERT INTO messages (channel_id, timestamp, id, value) VALUES ('smoke', TIMESTAMPTZ '$$timestamp', '$$id', 'sidecar image smoke test')" \
+          --command "SELECT timestamp, id, value FROM messages WHERE channel_id = 'smoke' AND timestamp >= TIMESTAMPTZ '$$timestamp' AND timestamp < TIMESTAMPTZ '2100-01-01T00:00:00Z' ORDER BY timestamp ASC, id ASC LIMIT 10"
+    restart: "no"
+    volumes:
+      - sidecar-security:/security:ro
+    networks: [smoke]
+
+volumes:
+  sidecar-security:
+
+networks:
+  smoke:
+    name: pulpitum-sidecar-smoke-network

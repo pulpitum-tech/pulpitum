@@ -1,0 +1,57 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "links": [
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Overview", "type": "link", "url": "/d/pulpitum-overview/pulpitum-overview?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Core metrics", "type": "link", "url": "/d/pulpitum-core-metrics/pulpitum-core-metrics?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Archiving", "type": "link", "url": "/d/pulpitum-archiving/pulpitum-archiving?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "SQL pool", "type": "link", "url": "/d/pulpitum-sql-pool/pulpitum-sql-pool?${job:queryparam}" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0 },
+        "overrides": [{ "matcher": { "id": "byName", "options": "p95 latency" }, "properties": [{ "id": "unit", "value": "ms" }] }]
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "options": { "showHeader": true },
+      "targets": [
+        { "refId": "A", "expr": "topk(10, sum by (db_query_text) (rate(traces_span_metrics_calls_total{job=~\"$job\", pulpitum_sql_origin=\"gateway\", db_query_text!=\"\"}[$__rate_interval])))", "format": "table", "instant": true },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le, db_query_text) (rate(traces_span_metrics_duration_milliseconds_bucket{job=~\"$job\", pulpitum_sql_origin=\"gateway\", db_query_text!=\"\"}[$__rate_interval])))", "format": "table", "instant": true }
+      ],
+      "title": "Top 10 gateway queries by throughput",
+      "transformations": [
+        { "id": "joinByField", "options": { "byField": "db_query_text", "mode": "inner" } },
+        { "id": "sortBy", "options": { "fields": [{ "field": "Value #A", "desc": true }] } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Time #A": true, "Time #B": true }, "renameByName": { "db_query_text": "Query text", "Value #A": "Throughput", "Value #B": "p95 latency" } } }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (db_operation_name) (rate(traces_span_metrics_calls_total{job=~\"$job\", pulpitum_sql_origin=\"gateway\", db_operation_name!=\"\"}[$__rate_interval]))", "legendFormat": "{{db_operation_name}}" }],
+      "title": "Gateway operations / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "100 * sum by (db_query_text) (rate(traces_span_metrics_calls_total{job=~\"$job\", pulpitum_sql_origin=\"gateway\", status_code=~\"STATUS_CODE_ERROR|Error\", db_query_text!=\"\"}[$__rate_interval])) / sum by (db_query_text) (rate(traces_span_metrics_calls_total{job=~\"$job\", pulpitum_sql_origin=\"gateway\", db_query_text!=\"\"}[$__rate_interval]))", "legendFormat": "{{db_query_text}}" }],
+      "title": "Gateway query error rate",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pulpitum", "queries", "performance"],
+  "templating": { "list": [{ "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(traces_span_metrics_calls_total, job)", "includeAll": true, "multi": true, "name": "job", "query": "label_values(traces_span_metrics_calls_total, job)", "refresh": 1, "type": "query" }] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Pulpitum query performance",
+  "uid": "pulpitum-query-performance",
+  "version": 1
+}

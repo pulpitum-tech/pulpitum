@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pulpitum-archive
+  labels:
+    app.kubernetes.io/part-of: pulpitum
+spec:
+  groups:
+    - name: pulpitum.archive
+      rules:
+        - alert: PulpitumArchiveFailures
+          expr: sum by (namespace, pod, pulpitum_archive_stage) (increase(pulpitum_archive_failures_total[15m])) > 0
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Pulpitum archive operation is failing"
+            description: "{{ $value }} failure(s) during the last 15m; inspect traces by pod and archive stage."
+        - alert: PulpitumArchiveStalled
+          expr: sum by (namespace, pod) (increase(pulpitum_archive_runs_total{pulpitum_archive_outcome="started"}[30m])) > sum by (namespace, pod) (increase(pulpitum_archive_runs_total{pulpitum_archive_outcome="success"}[30m]))
+          for: 30m
+          labels: { severity: critical }
+          annotations:
+            summary: "Pulpitum archive cutover appears stalled"
+            description: "A cutover started without a matching success. Check worker health and object-store connectivity."
+        - alert: PulpitumArchiveLatencyHigh
+          expr: histogram_quantile(0.95, sum by (le, namespace, pod) (rate(pulpitum_archive_duration_seconds_bucket[15m]))) > 300
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "Pulpitum p95 archive duration exceeds five minutes"

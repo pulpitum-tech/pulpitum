@@ -1,0 +1,8 @@
+title: Pulpitum
+description: Safe, append-oriented hot/cold table routing for CockroachDB and S3-compatible storage.
+url: "https://www.pulpitum.tech"
+baseurl: ""
+markdown: kramdown
+permalink: pretty
+theme: jekyll-theme-cayman
+repository: pulpitum-tech/pulpitum

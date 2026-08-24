@@ -1,0 +1,91 @@
+{
+  "annotations": { "list": [] },
+  "description": "Core database and workload signals derived from Pulpitum OpenTelemetry span metrics and connection-pool metrics.",
+  "editable": true,
+  "links": [
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Overview", "type": "link", "url": "/d/pulpitum-overview/pulpitum-overview?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Query performance", "type": "link", "url": "/d/pulpitum-query-performance/pulpitum-query-performance?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Archiving", "type": "link", "url": "/d/pulpitum-archiving/pulpitum-archiving?${job:queryparam}" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "SQL pool", "type": "link", "url": "/d/pulpitum-sql-pool/pulpitum-sql-pool?${job:queryparam}" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum by (db_operation_name) (rate(traces_span_metrics_calls_total{job=~\"$job\", db_operation_name!=\"\"}[$__rate_interval]))", "legendFormat": "{{db_operation_name}}" },
+        { "expr": "sum(rate(traces_span_metrics_calls_total{job=~\"$job\", db_operation_name!=\"\"}[$__rate_interval]))", "legendFormat": "Total queries" }
+      ],
+      "title": "SQL queries per second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.99, sum by (le, db_query_summary) (rate(traces_span_metrics_duration_milliseconds_bucket{job=~\"$job\", db_query_summary!=\"\"}[$__rate_interval])))", "legendFormat": "{{db_query_summary}}" }
+      ],
+      "title": "SQL statement latency, 99th percentile",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"waiters\"})", "legendFormat": "Waiting for a connection" },
+        { "expr": "sum(pulpitum_db_pool_connections{job=~\"$job\", pulpitum_db_pool_state=\"in_use\"})", "legendFormat": "Connections in use" }
+      ],
+      "title": "Connection pool pressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 20 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "100 * sum by (db_operation_name) (rate(traces_span_metrics_calls_total{job=~\"$job\", status_code=~\"STATUS_CODE_ERROR|Error\", db_operation_name!=\"\"}[$__rate_interval])) / sum by (db_operation_name) (rate(traces_span_metrics_calls_total{job=~\"$job\", db_operation_name!=\"\"}[$__rate_interval]))", "legendFormat": "{{db_operation_name}}" }
+      ],
+      "title": "SQL operation error rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "1000 * histogram_quantile(0.99, sum by (le) (rate(pulpitum_db_pool_acquire_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))", "legendFormat": "p99 acquire latency" }
+      ],
+      "title": "Connection acquisition latency, 99th percentile",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pulpitum", "core", "metrics", "database"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(traces_span_metrics_calls_total, job)",
+        "includeAll": true,
+        "multi": true,
+        "name": "job",
+        "query": "label_values(traces_span_metrics_calls_total, job)",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Pulpitum core metrics",
+  "uid": "pulpitum-core-metrics",
+  "version": 1
+}

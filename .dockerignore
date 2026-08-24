@@ -1,0 +1,14 @@
+target
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+.DS_Store
+.idea
+.vscode
+.zed
+coverage
+artifacts

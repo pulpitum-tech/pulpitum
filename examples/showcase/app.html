@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pulpitum chat showcase</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chatscope/chat-ui-kit-styles@1.4.0/dist/default/styles.min.css" />
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #111827; color: #e5e7eb; }
+      #root { height: 100vh; }
+      .showcase { height: 100%; display: flex; flex-direction: column; }
+      .topbar { padding: 14px 20px; border-bottom: 1px solid #293548; background: #172033; }
+      .topbar h1 { margin: 0; font-size: 16px; font-weight: 650; }
+      .topbar p { margin: 3px 0 0; color: #9ca3af; font-size: 12px; }
+      .chat-shell { min-height: 0; flex: 1; }
+      .cs-main-container { border: 0; background: #111827; }
+      .cs-conversation-list { background: #172033; }
+      .cs-conversation { color: #e5e7eb; border-bottom-color: #293548; }
+      .cs-conversation--active { background: #24314a; }
+      .cs-chat-container { background: #111827; }
+      .cs-message-list { background: #111827; }
+      .cs-message__content { background: #1f2937; color: #e5e7eb; }
+      .cs-message--outgoing .cs-message__content { background: #2563eb; }
+      .cs-conversation-header { background: #172033; color: #f9fafb; border-bottom-color: #293548; }
+      .cs-conversation-header__user-name { color: #f9fafb; }
+      .cs-conversation-header__info { color: #9ca3af; }
+      .status { color: #9ca3af; padding: 24px; font-size: 14px; }
+      @media (max-width: 600px) { .topbar { padding: 12px; } }
+    </style>
+  </head>
+  <body>
+</body>    <div id="root"></div>
+    <script type="module">
+      import React, { useEffect, useState } from "https://esm.sh/react@18.3.1";
+      import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
+      import {
+        MainContainer, ChatContainer, MessageList, Message,
+        ConversationList, Conversation, ConversationHeader
+      } from "https://esm.sh/@chatscope/chat-ui-kit-react@2.0.3?deps=react@18.3.1,react-dom@18.3.1";
+
+      const { createElement: h } = React;
+      const getJson = async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        return response.json();
+      };
+      const initials = (name) => name.slice(0, 2).toUpperCase();
+
+      function App() {
+        const [channels, setChannels] = useState([]);
+        const [selected, setSelected] = useState(null);
+        const [messages, setMessages] = useState([]);
+        const [error, setError] = useState("");
+
+        useEffect(() => {
+          getJson("/api/channels")
+            .then((items) => { setChannels(items); setSelected(items[0]?.id ?? null); })
+            .catch((cause) => setError(cause.message));
+        }, []);
+
+        useEffect(() => {
+          if (!selected) return;
+          let active = true;
+          const load = () => getJson(`/api/channels/${encodeURIComponent(selected)}/messages`)
+            .then((items) => { if (active) { setMessages(items); setError(""); } })
+            .catch((cause) => { if (active) setError(cause.message); });
+          load();
+          const interval = setInterval(load, 2000);
+          return () => { active = false; clearInterval(interval); };
+        }, [selected]);
+
+        const current = channels.find((channel) => channel.id === selected);
+        if (error && !channels.length) return h("main", { className: "showcase" }, h("div", { className: "status" }, `Unable to load chat: ${error}`));
+
+        return h("main", { className: "showcase" },
+          h("header", { className: "topbar" }, h("h1", null, "Pulpitum chat showcase"), h("p", null, "Live records are read across archived and hot buckets.")),
+          h("section", { className: "chat-shell" },
+            h(MainContainer, { responsive: true },
+              h(ConversationList, null,
+                channels.map((channel) => h(Conversation, {
+                  key: channel.id,
+                  name: `# ${channel.name}`,
+                  info: channel.id === selected ? "Live" : "",
+                  active: channel.id === selected,
+                  onClick: () => setSelected(channel.id),
+                }))
+              ),
+              h(ChatContainer, null,
+                h(ConversationHeader, null,
+                  h(ConversationHeader.Content, { userName: current ? `# ${current.name}` : "Loading…", info: error || "Refreshing every 2 seconds" })
+                ),
+                h(MessageList, null,
+                  messages.map((message) => h(Message, {
+                    key: message.id,
+                    model: {
+                      message: message.text,
+                      sentTime: new Date(message.timestamp).toLocaleString(),
+                      sender: message.actor,
+                      direction: message.actor === "Ada" ? "outgoing" : "incoming",
+                      position: "single",
+                    },
+                  }))
+                )
+              )
+            )
+          )
+        );
+      }
+      createRoot(document.getElementById("root")).render(h(App));
+    </script>
+  </body>
+</html>

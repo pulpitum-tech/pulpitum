@@ -1,0 +1,96 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "links": [
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Overview", "type": "link", "url": "/d/pulpitum-overview/pulpitum-overview" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Core metrics", "type": "link", "url": "/d/pulpitum-core-metrics/pulpitum-core-metrics" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "Query performance", "type": "link", "url": "/d/pulpitum-query-performance/pulpitum-query-performance" },
+    { "includeTimeRange": true, "keepTimeRange": true, "targetBlank": false, "title": "SQL pool", "type": "link", "url": "/d/pulpitum-sql-pool/pulpitum-sql-pool" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (pulpitum_archive_coordinator_outcome) (rate(pulpitum_archive_coordinator_cycles_total{exported_job=~\"$job\", pulpitum_archive_coordinator_outcome=~\"$coordinator_outcome\"}[$__rate_interval]))", "legendFormat": "{{pulpitum_archive_coordinator_outcome}}" }],
+      "title": "Coordinator cycles / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "1000 * histogram_quantile(0.95, sum by (le, pulpitum_archive_coordinator_outcome) (rate(pulpitum_archive_coordinator_duration_seconds_bucket{exported_job=~\"$job\", pulpitum_archive_coordinator_outcome=~\"$coordinator_outcome\"}[$__rate_interval])))", "legendFormat": "p95 {{pulpitum_archive_coordinator_outcome}}" }],
+      "title": "Coordinator cycle duration p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (pulpitum_archive_coordinator_phase) (rate(pulpitum_archive_coordinator_phase_transitions_total{exported_job=~\"$job\", pulpitum_archive_coordinator_phase=~\"$coordinator_phase\"}[$__rate_interval]))", "legendFormat": "{{pulpitum_archive_coordinator_phase}}" }],
+      "title": "Coordinator phase entries / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (pulpitum_archive_coordinator_phase) (pulpitum_archive_coordinator_jobs{exported_job=~\"$job\", pulpitum_archive_coordinator_phase=~\"$coordinator_phase\"})", "legendFormat": "{{pulpitum_archive_coordinator_phase}}" }],
+      "title": "Discovered work in the latest cycle",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (pulpitum_archive_operation, pulpitum_archive_coordinator_phase) (traces_span_metrics_calls_total{exported_job=~\"$job\", service_name=~\"$job\", pulpitum_archive_operation=~\".+\", pulpitum_archive_operation=~\"$archive_operation\", pulpitum_archive_coordinator_phase=~\".+\", pulpitum_archive_coordinator_phase=~\"$coordinator_phase\"})", "legendFormat": "{{pulpitum_archive_operation}} · {{pulpitum_archive_coordinator_phase}}" }],
+      "title": "Archival work by operation and phase since start",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, pulpitum_archive_operation, pulpitum_archive_coordinator_phase) (traces_span_metrics_duration_milliseconds_bucket{exported_job=~\"$job\", service_name=~\"$job\", pulpitum_archive_operation=~\".+\", pulpitum_archive_operation=~\"$archive_operation\", pulpitum_archive_coordinator_phase=~\".+\", pulpitum_archive_coordinator_phase=~\"$coordinator_phase\"}))", "legendFormat": "p95 {{pulpitum_archive_operation}} · {{pulpitum_archive_coordinator_phase}}" }],
+      "title": "Archival work duration p95 since start",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "sum by (db_operation_name, db_query_summary) (traces_span_metrics_calls_total{exported_job=~\"$job\", service_name=~\"$job\", db_operation_name=~\".+\"})", "legendFormat": "{{db_operation_name}} {{db_query_summary}}" }],
+      "title": "Archiver database work since start",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, db_operation_name, db_query_summary) (traces_span_metrics_duration_milliseconds_bucket{exported_job=~\"$job\", service_name=~\"$job\", db_operation_name=~\".+\"}))", "legendFormat": "p95 {{db_operation_name}} {{db_query_summary}}" }],
+      "title": "Archiver database work duration p95 since start",
+      "type": "bargauge"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pulpitum", "archiving"],
+  "templating": { "list": [
+    { "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(pulpitum_archive_coordinator_cycles_total, exported_job)", "includeAll": true, "multi": true, "name": "job", "query": "label_values(pulpitum_archive_coordinator_cycles_total, exported_job)", "refresh": 1, "type": "query" },
+    { "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(pulpitum_archive_coordinator_phase_transitions_total{exported_job=~\"$job\"}, pulpitum_archive_coordinator_phase)", "includeAll": true, "multi": true, "name": "coordinator_phase", "query": "label_values(pulpitum_archive_coordinator_phase_transitions_total{exported_job=~\"$job\"}, pulpitum_archive_coordinator_phase)", "refresh": 1, "type": "query" },
+    { "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(pulpitum_archive_coordinator_cycles_total{exported_job=~\"$job\"}, pulpitum_archive_coordinator_outcome)", "includeAll": true, "multi": true, "name": "coordinator_outcome", "query": "label_values(pulpitum_archive_coordinator_cycles_total{exported_job=~\"$job\"}, pulpitum_archive_coordinator_outcome)", "refresh": 1, "type": "query" },
+    { "current": { "selected": true, "text": "All", "value": ["$__all"] }, "datasource": { "type": "prometheus", "uid": "prometheus" }, "definition": "label_values(traces_span_metrics_calls_total{exported_job=~\"$job\", service_name=~\"$job\", pulpitum_archive_coordinator_phase=~\".+\"}, pulpitum_archive_operation)", "includeAll": true, "multi": true, "name": "archive_operation", "query": "label_values(traces_span_metrics_calls_total{exported_job=~\"$job\", service_name=~\"$job\", pulpitum_archive_coordinator_phase=~\".+\"}, pulpitum_archive_operation)", "refresh": 1, "type": "query" }
+  ] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Pulpitum archiving",
+  "uid": "pulpitum-archiving",
+  "version": 3
+}
