@@ -1,0 +1,23 @@
+flowchart LR
+    Client[Application or PostgreSQL client] --> Sidecar[Optional PostgreSQL-wire sidecar]
+    Client --> Table[DurableTable API]
+    Sidecar --> Table
+
+    Table --> Store[Durable bucket store]
+    Store --> Hot[(CockroachDB records and bucket metadata)]
+    Table --> ArchiveRead[Immutable archive reader]
+    ArchiveRead --> Objects[(S3-compatible object store)]
+
+    Migrator[Privileged migration job] --> Hot
+    Archiver[Opt-in archival worker] --> Fence[Claim fenced lease]
+    Fence --> Snapshot[Snapshot immutable bucket]
+    Snapshot --> Objects
+    Objects --> Verify[Verify payload and manifest]
+    Verify --> Publish[Publish archive route]
+    Publish --> Hot
+    Publish --> Cleanup[Delete hot rows after publication]
+    Cleanup --> Hot
+
+    Table --> Telemetry[OpenTelemetry]
+    Archiver --> Telemetry
+    Sidecar --> Telemetry
