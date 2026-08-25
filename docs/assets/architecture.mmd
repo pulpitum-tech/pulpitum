@@ -1,23 +1,51 @@
 flowchart LR
-    Client[Application or PostgreSQL client] --> Sidecar[Optional PostgreSQL-wire sidecar]
-    Client --> Table[DurableTable API]
-    Sidecar --> Table
+    subgraph Clients
+        direction TB
+        App[Application]
+        SQL[Optional PostgreSQL-wire sidecar]
+    end
 
-    Table --> Store[Durable bucket store]
-    Store --> Hot[(CockroachDB records and bucket metadata)]
-    Table --> ArchiveRead[Immutable archive reader]
-    ArchiveRead --> Objects[(S3-compatible object store)]
+    subgraph Runtime[Application runtime]
+        Table[DurableTable]
+    end
 
-    Migrator[Privileged migration job] --> Hot
-    Archiver[Opt-in archival worker] --> Fence[Claim fenced lease]
-    Fence --> Snapshot[Snapshot immutable bucket]
-    Snapshot --> Objects
-    Objects --> Verify[Verify payload and manifest]
-    Verify --> Publish[Publish archive route]
-    Publish --> Hot
-    Publish --> Cleanup[Delete hot rows after publication]
-    Cleanup --> Hot
+    subgraph Storage
+        direction TB
+        CRDB[(CockroachDB<br/>hot records and metadata)]
+        S3[(S3-compatible object store<br/>immutable archive objects)]
+    end
 
-    Table --> Telemetry[OpenTelemetry]
-    Archiver --> Telemetry
-    Sidecar --> Telemetry
+    App --> Table
+    SQL --> Table
+    Table --> CRDB
+    Table --> S3
+
+    subgraph Archive[Opt-in archival lane]
+        direction LR
+        Migrate[Privileged<br/>migration job]
+        Archiver[Archival worker<br/>disabled by default]
+        Claim[Claim fenced lease]
+        Verify[Snapshot, verify,<br/>and publish]
+        Cleanup[Cleanup hot rows]
+        Migrate -.-> CRDB
+        Archiver --> Claim --> Verify --> Cleanup
+    end
+
+    Verify --> S3
+    Verify --> CRDB
+    Cleanup --> CRDB
+
+    Telemetry[OpenTelemetry<br/>metrics and traces]
+    Table -.-> Telemetry
+    Archiver -.-> Telemetry
+
+    classDef client fill:#e0f2fe,stroke:#38bdf8,color:#1f3040
+    classDef runtime fill:#dcfce7,stroke:#22c55e,color:#1f3040
+    classDef storage fill:#fff7ed,stroke:#f97316,color:#1f3040
+    classDef archive fill:#fef3c7,stroke:#eab308,color:#1f3040
+    classDef telemetry fill:#ecfeff,stroke:#06b6d4,color:#1f3040
+    class App,SQL client
+    class Table runtime
+    class CRDB,S3 storage
+    class Migrate,Archiver,Claim,Verify,Cleanup archive
+    class Telemetry telemetry
