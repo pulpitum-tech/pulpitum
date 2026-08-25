@@ -33,6 +33,41 @@ The built-in chat mapping is:
 | `id` | `sort_key` |
 | `value` | record payload |
 
+## How the pieces fit together
+
+```mermaid
+flowchart TD
+    Client[Application or PostgreSQL client] --> Sidecar[Optional PostgreSQL-wire sidecar]
+    Client --> Table[DurableTable API]
+    Sidecar --> Table
+
+    Table --> Store[Durable bucket store]
+    Store --> Hot[(CockroachDB records and bucket metadata)]
+    Table --> ArchiveRead[Immutable archive reader]
+    ArchiveRead --> Objects[(S3-compatible object store)]
+
+    Migrator[Privileged migration job] --> Hot
+    Archiver[Opt-in archival worker] --> Fence[Claim fenced lease]
+    Fence --> Snapshot[Snapshot immutable bucket]
+    Snapshot --> Objects
+    Objects --> Verify[Verify payload and manifest]
+    Verify --> Publish[Publish archive route]
+    Publish --> Hot
+    Publish --> Cleanup[Delete hot rows after publication]
+    Cleanup --> Hot
+
+    Table --> Telemetry[OpenTelemetry]
+    Archiver --> Telemetry
+    Sidecar --> Telemetry
+```
+
+The hot path stays in CockroachDB. The archival worker is disabled by default because it eventually deletes the hot copy; when explicitly enabled, it claims a durable lease, verifies immutable objects, publishes the archive route, and only then performs cleanup.
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true });
+</script>
+
 ## Supported deployment profile
 
 Pulpitum currently supports a deliberately narrow operational profile:
