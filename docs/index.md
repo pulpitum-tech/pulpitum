@@ -65,7 +65,8 @@ The hot path stays in CockroachDB. The archival worker is disabled by default be
 
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true });
+  mermaid.initialize({ startOnLoad: false });
+  await mermaid.run({ querySelector: ".mermaid" });
 </script>
 
 ## Supported deployment profile
