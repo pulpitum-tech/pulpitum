@@ -35,7 +35,6 @@ The built-in chat mapping is:
 
 ## How the pieces fit together
 
-```mermaid
 ![Pulpitum architecture diagram](assets/architecture.svg)
 
 The [editable Mermaid source](assets/architecture.mmd) is kept alongside the SVG. The hot path stays in CockroachDB. The archival worker is disabled by default because it eventually deletes the hot copy; when explicitly enabled, it claims a durable lease, verifies immutable objects, publishes the archive route, and only then performs cleanup.
